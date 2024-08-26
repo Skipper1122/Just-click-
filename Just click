@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garip Nokta</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f8ff;
+        }
+        .point {
+            width: 50px;
+            height: 50px;
+            background-color: #4CAF50;
+            border-radius: 50%;
+            position: absolute;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        .point.clicked {
+            background-color: #FF5733;
+            transform: scale(1.2);
+        }
+        .duck {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40em; /* 4 kat daha büyük ördek emojisi */
+            display: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+    <div id="point" class="point"></div>
+    <div id="duck" class="duck">🦆</div>
+    <audio id="duckSound" src="https://www.soundjay.com/button/beep-07.wav" preload="auto"></audio>
+    
+    <script>
+        const point = document.getElementById('point');
+        const duck = document.getElementById('duck');
+        const duckSound = document.getElementById('duckSound');
+        let clickCount = 0;
+
+        point.addEventListener('click', function() {
+            clickCount++;
+            point.classList.add('clicked');
+            setTimeout(() => {
+                point.classList.remove('clicked');
+            }, 300);
+
+            if (clickCount % 15 === 0) { // Her 15 tıklamada bir
+                duck.style.display = 'block';
+                duckSound.play(); // Ses çal
+                setTimeout(() => {
+                    duck.style.display = 'none'; // 0.5 saniye sonra ördeği gizle
+                }, 500);
+            }
+        });
+    </script>
+</body>
+</html>
