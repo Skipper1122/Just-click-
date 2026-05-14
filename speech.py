@@ -64,6 +64,7 @@ class TurkishSpeechRecognizer:
         self.recognizer = sr.Recognizer()
         self.recognizer.dynamic_energy_threshold = True
         self.model_path = Path(model_path)
+        self._vosk_model = None
         self.use_vosk = self._vosk_is_ready()
 
     def _vosk_is_ready(self) -> bool:
@@ -112,8 +113,9 @@ class TurkishSpeechRecognizer:
         # Importing here keeps Vosk optional. The package is only loaded when
         # both the library and the local model folder are available.
         vosk = importlib.import_module("vosk")
-        model = vosk.Model(str(self.model_path))
-        recognizer = vosk.KaldiRecognizer(model, audio.sample_rate)
+        if self._vosk_model is None:
+            self._vosk_model = vosk.Model(str(self.model_path))
+        recognizer = vosk.KaldiRecognizer(self._vosk_model, audio.sample_rate)
         recognizer.AcceptWaveform(audio.get_raw_data(convert_rate=audio.sample_rate, convert_width=2))
         result = json.loads(recognizer.Result())
         return result.get("text", "")

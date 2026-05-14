@@ -1,81 +1,121 @@
-"""Command handling for the Jarvis AI Voice Assistant.
-
-This file keeps the assistant's "brain" separate from the microphone,
-speaker, and user interface code.  The responses are intentionally simple so
-beginners can add new Turkish commands easily.
-"""
+"""Command understanding and action routing for Jarvis."""
 
 from __future__ import annotations
 
 import datetime as _dt
 import webbrowser
+from dataclasses import dataclass
+
+from ai_client import AIClient
+from launcher import ApplicationLauncher
+from memory import MemoryStore
+from weather import WeatherReport
+
+
+@dataclass
+class AssistantResult:
+    """Result returned after Jarvis handles a command."""
+
+    response: str
+    action: str
+    keep_active: bool = True
+    should_exit: bool = False
 
 
 class JarvisAssistant:
-    """Small Turkish command assistant.
+    """Turkish, memory-aware command assistant."""
 
-    The `handle_command` method returns the text Jarvis should say.  It also
-    returns a boolean that tells the main loop whether Jarvis should keep
-    listening for commands (`True`) or go back to wake-word mode (`False`).
-    """
+    def __init__(self, memory: MemoryStore, ai_client: AIClient, launcher: ApplicationLauncher) -> None:
+        self.memory = memory
+        self.ai_client = ai_client
+        self.launcher = launcher
+        self.latest_weather: WeatherReport | None = None
 
-    def __init__(self) -> None:
-        self.name = "Jarvis"
+    def update_weather(self, report: WeatherReport) -> None:
+        self.latest_weather = report
 
-    def handle_command(self, command: str) -> tuple[str, bool]:
-        """Understand one Turkish command and create a spoken response.
-
-        Args:
-            command: Text recognized from the user's microphone.
-
-        Returns:
-            A tuple of `(response_text, keep_active)`.
-        """
+    def handle_command(self, command: str) -> AssistantResult:
+        """Understand one Turkish command and create a spoken response."""
         text = command.lower().strip()
 
         if not text:
-            return "Sizi duyamadım efendim. Lütfen tekrar eder misiniz?", True
+            return self._remember(command, "empty", "Sizi duyamadım efendim. Lütfen tekrar eder misiniz?")
 
-        # Words that stop command mode but keep the program open.
         if any(word in text for word in ["uyku", "bekle", "dinlen", "sus"]):
-            return "Tamam efendim. Uyku moduna geçiyorum. Beni Jarvis diyerek çağırabilirsiniz.", False
+            return self._remember(
+                command,
+                "sleep",
+                "Tamam efendim. Uyku moduna geçiyorum. Beni Jarvis diyerek çağırabilirsiniz.",
+                keep_active=False,
+            )
 
-        # Words that close the whole application.
         if any(word in text for word in ["kapat", "çıkış", "görüşürüz", "programı kapat"]):
-            return "Görüşürüz efendim. Sistemi kapatıyorum.", False
+            return self._remember(
+                command,
+                "exit",
+                "Görüşürüz efendim. Sistemi kapatıyorum.",
+                keep_active=False,
+                should_exit=True,
+            )
 
         if "saat" in text:
             now = _dt.datetime.now().strftime("%H:%M")
-            return f"Saat şu anda {now}.", True
+            return self._remember(command, "time", f"Saat şu anda {now}.")
 
         if "tarih" in text or "bugün" in text:
             today = _dt.datetime.now().strftime("%d.%m.%Y")
-            return f"Bugünün tarihi {today}.", True
+            return self._remember(command, "date", f"Bugünün tarihi {today}.")
+
+        if "hava" in text:
+            if self.latest_weather:
+                return self._remember(command, "weather", f"Hava durumu: {self.latest_weather.display_text()}.")
+            return self._remember(command, "weather", "Hava durumu henüz yüklenmedi efendim.")
 
         if "merhaba" in text or "selam" in text:
-            return "Merhaba efendim. Size nasıl yardımcı olabilirim?", True
+            user_name = self.memory.data.get("facts", {}).get("user_name", "efendim")
+            return self._remember(command, "greeting", f"Merhaba {user_name}. Sistemler hazır.")
 
         if "nasılsın" in text:
-            return "Sistemlerim çalışıyor efendim. Yardıma hazırım.", True
+            return self._remember(command, "status", "Sistemlerim çalışıyor efendim. Dinleme, hafıza ve arayüz modülleri aktif.")
 
         if "adın ne" in text or "kimsin" in text:
-            return "Ben Jarvis. Türkçe konuşabilen basit bir yapay zekâ ses asistanıyım.", True
+            return self._remember(command, "identity", "Ben Jarvis. Türkçe konuşan, öğrenen ve uygulama açabilen masaüstü asistanınızım.")
 
-        if "arama yap" in text or "google" in text:
-            query = text.replace("arama yap", "").replace("google", "").strip()
+        if "aç" in text or "çalıştır" in text or "başlat" in text:
+            success, response, action = self.launcher.open_app(text)
+            if success:
+                self.memory.remember_app_launch(action.replace("open_", ""))
+            return self._remember(command, action, response)
+
+        if "arama yap" in text or "google" in text or "internette ara" in text:
+            query = text.replace("arama yap", "").replace("google", "").replace("internette ara", "").strip()
             if query:
                 webbrowser.open(f"https://www.google.com/search?q={query}")
-                return f"Google üzerinde {query} için arama yapıyorum.", True
-            return "Ne aramamı istersiniz efendim?", True
+                return self._remember(command, "web_search", f"Google üzerinde {query} için arama yapıyorum.")
+            return self._remember(command, "web_search_empty", "Ne aramamı istersiniz efendim?")
 
         if "youtube" in text:
             webbrowser.open("https://www.youtube.com")
-            return "YouTube'u açıyorum efendim.", True
+            self.memory.remember_app_launch("youtube")
+            return self._remember(command, "open_youtube", "YouTube'u açıyorum efendim.")
 
         if "yardım" in text or "neler yapabilirsin" in text:
-            return (
-                "Saat söyleyebilirim, tarihi söyleyebilirim, Google araması yapabilirim, "
-                "YouTube'u açabilirim ve uyku moduna geçebilirim."
-            ), True
+            return self._remember(
+                command,
+                "help",
+                "Saat, tarih ve hava durumunu söyleyebilirim; tarayıcı, Spotify, hesap makinesi ve dosya gezginini açabilirim; hafızama tercihlerinizi kaydedebilirim.",
+            )
 
-        return "Bu komutu henüz bilmiyorum efendim. Yardım derseniz örnek komutları söyleyebilirim.", True
+        response = self.ai_client.ask(command)
+        return self._remember(command, "ai_chat", response)
+
+    def _remember(
+        self,
+        command: str,
+        action: str,
+        response: str,
+        keep_active: bool = True,
+        should_exit: bool = False,
+    ) -> AssistantResult:
+        self.memory.remember_command(command, action, response)
+        return AssistantResult(response=response, action=action, keep_active=keep_active, should_exit=should_exit)
