@@ -25,6 +25,38 @@ A beginner-friendly Turkish voice assistant project for Visual Studio Code.  It 
 └── README.md         # Setup and usage guide
 ```
 
+## Download this project
+
+Choose one option:
+
+### Option A: Download as a ZIP
+
+1. On GitHub, open the repository page for this project.
+2. Click **Code**.
+3. Click **Download ZIP**.
+4. Extract the ZIP file.
+5. Open the extracted folder in Visual Studio Code.
+
+### Option B: Clone with Git
+
+If you have Git installed, open a terminal and run:
+
+```bash
+git clone <repository-url>
+cd <repository-folder>
+```
+
+Replace `<repository-url>` with the URL from the GitHub **Code** button.
+
+## Quick start in Visual Studio Code
+
+1. Download or clone the project.
+2. Open the project folder in VS Code.
+3. Open the VS Code terminal with **Terminal > New Terminal**.
+4. Create a virtual environment.
+5. Install the packages from `requirements.txt`.
+6. Run `python main.py`.
+
 ## Installation in Visual Studio Code
 
 1. Open this folder in VS Code.
@@ -57,6 +89,8 @@ pip install -r requirements.txt
 
 ## How to run in VS Code terminal
 
+Make sure your virtual environment is active, then run:
+
 ```bash
 python main.py
 ```
@@ -66,6 +100,8 @@ If your system uses `python3` instead of `python`, run:
 ```bash
 python3 main.py
 ```
+
+You can also press **F5** in VS Code and choose **Run Jarvis AI Voice Assistant** if the Python extension is installed.
 
 ## How to use
 
